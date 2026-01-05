@@ -96,7 +96,7 @@ namespace contact_before_motion{
       pos += state.contacts[i].c2.localPose.translation();
     }
     cnoid::Vector3 centorOfContact = pos / state.contacts.size();
-    node->heuristic() = (centorOfContact - goalConstraint->B_localpos().translation()).norm() < goalConstraint->precision();
+    node->heuristic() = (centorOfContact - goalConstraint->B_localpos().translation()).norm();
   }
 
   std::vector<std::shared_ptr<graph_search::Node> > WholeBodyContactPlanner::gatherAdjacentNodes(std::shared_ptr<graph_search::Planner::TransitionCheckParam> checkParam) {
@@ -397,8 +397,13 @@ namespace contact_before_motion{
       constraints0.push_back(scfrConstraints[i]);
     }
 
+    nominals.insert(nominals.end(), contactCheckParam->nominals.begin(), contactCheckParam->nominals.end());
+    double goalPrecision = std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint)->precision();
+    std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint)->precision() = 1e10;
+    nominals.push_back(contactCheckParam->goalConstraint);
+
     bool solved = false;
-    std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint{constraints0, constraints1, constraints2, contactCheckParam->nominals};
+    std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint{constraints0, constraints1, constraints2, nominals};
 
     std::vector<std::shared_ptr<prioritized_qp_base::Task> > prevTasks;
     solved  =  prioritized_inverse_kinematics_solver2::solveIKLoop(contactCheckParam->variables,
@@ -423,14 +428,14 @@ namespace contact_before_motion{
       solved = global_inverse_kinematics_solver::solveGIK(contactCheckParam->variables,
                                                           gikConstraints,
                                                           constraints2,
-                                                          contactCheckParam->nominals,
+                                                          nominals,
                                                           gikParam,
                                                           tmpPath);
     }
 
     if (solved && (ikState==IKState::DETACH_FIXED)) {
       postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
-      std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint_nominal{constraints0, constraints1, contactCheckParam->nominals};
+      std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint_nominal{constraints0, constraints1, nominals};
       std::vector<std::shared_ptr<prioritized_qp_base::Task> > prevTasks_;
       prioritized_inverse_kinematics_solver2::IKParam pikParam = contactCheckParam->pikParam;
       pikParam.minIteration = 40;
@@ -442,6 +447,7 @@ namespace contact_before_motion{
                                                           tmpPath
                                                           );
     }
+    std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint)->precision() = goalPrecision;
 
     // for ( int i=0; i<constraints0.size(); i++ ) {
     //   std::cerr << "constraints0: "<< constraints0[i]->isSatisfied() << std::endl;
