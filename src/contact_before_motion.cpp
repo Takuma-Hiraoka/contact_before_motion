@@ -4,6 +4,7 @@
 #include <ik_constraint2_scfr/ik_constraint2_scfr.h>
 #include <limits>
 #include <random>
+#include <unordered_set>
 
 namespace contact_before_motion{
   inline std::set<cnoid::BodyPtr> getBodies(const std::vector<cnoid::LinkPtr>& links){
@@ -388,7 +389,7 @@ namespace contact_before_motion{
     }
     moveContactConstraint->eval_link() = moveContactConstraint->B_link();
     moveContactConstraint->eval_localR() = moveContactConstraint->B_localpos().linear();
-    moveContactConstraint->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 0.0;
+    moveContactConstraint->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     constraints2.push_back(moveContactConstraint);
 
     for (int i=0;i<scfrConstraints.size();i++) {
@@ -467,13 +468,6 @@ namespace contact_before_motion{
 
     if (solved) {
       postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
-      moveContact.c1.localPose.linear() = moveContactConstraint->A_localpos().linear();
-      cnoid::Matrix3d B_rot = cnoid::Matrix3d::Identity();
-      if (moveContactConstraint->B_link()) B_rot = moveContactConstraint->B_link()->R();
-      cnoid::Matrix3d A_rot;
-      if (moveContactConstraint->A_link()) A_rot = moveContactConstraint->A_link()->R() * moveContactConstraint->A_localpos().linear();
-      else A_rot = moveContactConstraint->A_localpos().linear();
-      moveContact.c2.localPose.linear() = (B_rot.transpose() * A_rot) * cnoid::rotFromRpy(0.0, M_PI, M_PI/2);
     }
 
     return solved;

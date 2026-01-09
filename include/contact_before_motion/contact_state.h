@@ -30,8 +30,8 @@ namespace contact_before_motion{
         bool has_a = false;
         for (int j=0;(j<b.contacts.size()) && !has_a; j++) {
           if (!(a.contacts[i] == b.contacts[j])) continue; // 名前が違う
-          if (!((a.contacts[i].c1.linkName == b.contacts[j].c1.linkName) && ((a.contacts[i].c2.isStatic && b.contacts[i].c2.isStatic) || (a.contacts[i].c1.localPose.translation() == b.contacts[j].c1.localPose.translation())) && (a.contacts[i].c2.linkName == b.contacts[j].c2.linkName) && ((a.contacts[i].c1.isStatic && b.contacts[i].c1.isStatic) || (a.contacts[i].c2.localPose.translation() == b.contacts[j].c2.localPose.translation())) ||
-                ((a.contacts[i].c1.linkName == b.contacts[j].c2.linkName) && ((a.contacts[i].c2.isStatic && b.contacts[i].c1.isStatic) || (a.contacts[i].c1.localPose.translation() == b.contacts[j].c2.localPose.translation())) && (a.contacts[i].c2.linkName == b.contacts[j].c1.linkName) && ((a.contacts[i].c1.isStatic && b.contacts[i].c2.isStatic) || (a.contacts[i].c2.localPose.translation() == b.contacts[j].c1.localPose.translation()))))) continue; // translationが違う
+          if (!((a.contacts[i].c1.linkName == b.contacts[j].c1.linkName) && a.contacts[i].c1.localPose.isApprox(b.contacts[j].c1.localPose) && (a.contacts[i].c2.linkName == b.contacts[j].c2.linkName) && a.contacts[i].c2.localPose.isApprox(b.contacts[j].c2.localPose)) ||
+              ((a.contacts[i].c1.linkName == b.contacts[j].c2.linkName) && a.contacts[i].c1.localPose.isApprox(b.contacts[j].c2.localPose) && (a.contacts[i].c2.linkName == b.contacts[j].c1.linkName) && a.contacts[i].c2.localPose.isApprox(b.contacts[j].c1.localPose))) continue;
           has_a = true;
         }
         if (!has_a) return false;
