@@ -25,6 +25,7 @@ namespace contact_before_motion{
     global_inverse_kinematics_solver::GIKParam gikParam;
     std::shared_ptr<moveit_extensions::InterpolatedPropagationDistanceField> field;
     double addCandidateDistance = 2.0; // contactDynamicCandidateのルートリンクからこの距離を超えるものはgikを使うまでもなく解けないものとする
+    std::unordered_set<ContactStateKey, ContactStateKeyHash> graph_states;
 
     WholeBodyContactPlanner() {
       gikParam.maxTranslation = 2.0;

@@ -15,11 +15,60 @@ namespace contact_before_motion{
     return bodies;
   }
 
+  inline ContactStateKey toKey(const ContactState& state)
+  {
+    ContactStateKey key;
+    key.contacts.reserve(state.contacts.size());
+
+    for (int i=0; i<state.contacts.size(); i++){
+      ContactKey ck;
+
+      // 名前とリンク名のペアを hash 化（順番違いも吸収）
+      std::size_t h1 = std::hash<std::string>()(state.contacts[i].c1.bodyName + "#" + state.contacts[i].c1.linkName);
+      std::size_t h2 = std::hash<std::string>()(state.contacts[i].c2.bodyName + "#" + state.contacts[i].c2.linkName);
+
+      if (h1 < h2) {
+        ck.id1 = h1;
+        ck.id2 = h2;
+
+        cnoid::Vector3 t1 = state.contacts[i].c1.localPose.translation();
+        cnoid::Vector3 t2 = state.contacts[i].c2.localPose.translation();
+
+        ck.x1 = t1[0]; ck.y1 = t1[1]; ck.z1 = t1[2];
+        ck.x2 = t2[0]; ck.y2 = t2[1]; ck.z2 = t2[2];
+      } else {
+        ck.id1 = h2;
+        ck.id2 = h1;
+
+        cnoid::Vector3 t1 = state.contacts[i].c2.localPose.translation();
+        cnoid::Vector3 t2 = state.contacts[i].c1.localPose.translation();
+
+        ck.x1 = t1[0]; ck.y1 = t1[1]; ck.z1 = t1[2];
+        ck.x2 = t2[0]; ck.y2 = t2[1]; ck.z2 = t2[2];
+      }
+
+      key.contacts.push_back(ck);
+    }
+
+    // ContactState の contacts 順不同を吸収
+    std::sort(key.contacts.begin(), key.contacts.end(),
+              [](ContactKey& a, ContactKey& b){
+                return std::tie(a.id1, a.id2, a.x1, a.y1, a.z1, a.x2, a.y2, a.z2)
+                  < std::tie(b.id1, b.id2, b.x1, b.y1, b.z1, b.x2, b.y2, b.z2);
+              });
+
+    return key;
+  }
+
   bool WholeBodyContactPlanner::solve() {
     std::shared_ptr<ContactNode> current_node = std::make_shared<ContactNode>();
     if (this->currentContactState->transition.size() == 0) this->currentContactState->transition.push_back(this->currentContactState->frame);
     current_node->state() = *(this->currentContactState);
     this->graph().push_back(current_node);
+    this->graph_states.reserve(std::numeric_limits<int>::max());
+    for (int i=0;i<this->graph().size();i++) {
+      this->graph_states.insert(toKey(std::static_pointer_cast<ContactNode>(this->graph()[i])->state()));
+    }
 
     return this->search();
   }
@@ -169,14 +218,16 @@ namespace contact_before_motion{
 
   void WholeBodyContactPlanner::addNodes2Graph(std::vector<std::shared_ptr<graph_search::Node> >& nodes) {
     // 再訪しない
-    for (int i=0;i<this->graph().size();i++) {
-      for(int j=0;j<nodes.size();j++) {
-        if (std::static_pointer_cast<ContactNode>(this->graph()[i])->state() == std::static_pointer_cast<ContactNode>(nodes[j])->state()) {
-          nodes.erase(nodes.begin()+j);
-          break;
-        }
-      }
+    nodes.erase(std::remove_if(nodes.begin(), nodes.end(),
+                               [&](const std::shared_ptr<graph_search::Node>& n) {
+                                 return graph_states.count(toKey(std::static_pointer_cast<ContactNode>(n)->state())) > 0;
+                               }),
+                nodes.end());
+
+    for (int i=0;i<nodes.size();i++) {
+      graph_states.insert(toKey(std::static_pointer_cast<ContactNode>(nodes[i])->state()));
     }
+
     graph_search::Planner::addNodes2Graph(nodes);
   }
 
@@ -434,21 +485,24 @@ namespace contact_before_motion{
                                                           tmpPath);
     }
 
-    if (solved && (ikState==IKState::DETACH_FIXED)) {
+    std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint)->precision() = goalPrecision;
+    if (solved && ((ikState==IKState::ATTACH_FIXED) || (ikState==IKState::DETACH_FIXED))) {
       postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
-      std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint_nominal{constraints0, constraints1, nominals};
+      std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint_goal;
+      constraint_goal.push_back(constraints0);
+      constraint_goal.push_back(constraints1);
+      if (ikState==IKState::ATTACH_FIXED) constraint_goal.push_back(constraints2);
+      constraint_goal.push_back(std::vector<std::shared_ptr<ik_constraint2::IKConstraint> >{contactCheckParam->goalConstraint});
+      constraint_goal.push_back(contactCheckParam->nominals);
       std::vector<std::shared_ptr<prioritized_qp_base::Task> > prevTasks_;
-      prioritized_inverse_kinematics_solver2::IKParam pikParam = contactCheckParam->pikParam;
-      pikParam.minIteration = 40;
       prioritized_inverse_kinematics_solver2::solveIKLoop(contactCheckParam->variables,
-                                                          constraint_nominal,
+                                                          constraint_goal,
                                                           contactCheckParam->rejections,
                                                           prevTasks_,
-                                                          pikParam,
+                                                          contactCheckParam->pikParam,
                                                           tmpPath
                                                           );
     }
-    std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint)->precision() = goalPrecision;
 
     // for ( int i=0; i<constraints0.size(); i++ ) {
     //   std::cerr << "constraints0: "<< constraints0[i]->isSatisfied() << std::endl;

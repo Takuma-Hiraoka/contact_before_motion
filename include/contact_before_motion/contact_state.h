@@ -43,4 +43,50 @@ namespace contact_before_motion{
     std::vector<double> frame;
     std::vector<Contact> contacts;
   };
+
+  struct ContactKey {
+    // Contact の識別子として bodyName-linkName のペアの hash （rotation 無視）
+    std::size_t id1;
+    std::size_t id2;
+
+    double x1, y1, z1;  // c1.localPose.translation
+    double x2, y2, z2;  // c2.localPose.translation
+
+    bool operator==(const ContactKey& o) const {
+      return id1 == o.id1 &&
+        id2 == o.id2 &&
+        x1 == o.x1 && y1 == o.y1 && z1 == o.z1 &&
+        x2 == o.x2 && y2 == o.y2 && z2 == o.z2;
+    }
+  };
+
+  struct ContactStateKey {
+    std::vector<ContactKey> contacts;
+
+    bool operator==(const ContactStateKey& o) const {
+      return contacts == o.contacts;
+    }
+  };
+  inline void mix(std::size_t& h, std::size_t v)
+  {
+    h ^= v + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+  }
+  struct ContactStateKeyHash {
+    std::size_t operator()(const ContactStateKey& key) const {
+      std::size_t h = 0;
+      for (int i=0; i<key.contacts.size(); i++) {
+        mix(h, key.contacts[i].id1);
+        mix(h, key.contacts[i].id2);
+
+        mix(h, std::hash<double>()(key.contacts[i].x1));
+        mix(h, std::hash<double>()(key.contacts[i].y1));
+        mix(h, std::hash<double>()(key.contacts[i].z1));
+        mix(h, std::hash<double>()(key.contacts[i].x2));
+        mix(h, std::hash<double>()(key.contacts[i].y2));
+        mix(h, std::hash<double>()(key.contacts[i].z2));
+      }
+      return h;
+    }
+  };
+
 }
