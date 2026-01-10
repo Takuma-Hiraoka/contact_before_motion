@@ -161,7 +161,9 @@ namespace contact_before_motion{
     if (extend_state.contacts.size() >= 2) {
       for (int i=0; i<extend_state.contacts.size();i++) {
         std::shared_ptr<ContactNode> newNode = std::make_shared<ContactNode>();
-        newNode->state() = extend_state;
+        // frameとcontactsのみコピーする. transitionは使わないうえにすべての子ノードでコピーすると重い
+        newNode->state().frame = extend_state.frame;
+        newNode->state().contacts = extend_state.contacts;
         newNode->state().contacts.erase(newNode->state().contacts.begin()+i);
         adjacentNodes.push_back(newNode);
       }
@@ -199,7 +201,9 @@ namespace contact_before_motion{
 
       for (int j=0; j<contactStaticCandidatesLimited.size(); j++) {
         std::shared_ptr<ContactNode> newNode = std::make_shared<ContactNode>();
-        newNode->state() = extend_state;
+        // frameとcontactsのみコピーする. transitionは使わないうえにすべての子ノードでコピーすると重い
+        newNode->state().frame = extend_state.frame;
+        newNode->state().contacts = extend_state.contacts;
         Contact c = Contact(*(contactCheckParam->contactDynamicCandidates[i]), *(contactStaticCandidatesLimited[j]));
         newNode->state().contacts.push_back(c);
         adjacentNodes.push_back(newNode);
