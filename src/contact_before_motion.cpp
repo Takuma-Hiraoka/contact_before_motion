@@ -141,12 +141,18 @@ namespace contact_before_motion{
     std::shared_ptr<ContactTransitionCheckParam> contactCheckParam = std::static_pointer_cast<WholeBodyContactPlanner::ContactTransitionCheckParam>(checkParam);
     ContactState state = std::static_pointer_cast<ContactNode>(node)->state();
     std::shared_ptr<ik_constraint2::PositionConstraint> goalConstraint = std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint);
-    cnoid::Vector3 pos = cnoid::Vector3::Zero();
-    for (int i=0; i<state.contacts.size(); i++) {
-      pos += state.contacts[i].c2.localPose.translation();
-    }
-    cnoid::Vector3 centorOfContact = pos / state.contacts.size();
-    node->heuristic() = (centorOfContact - goalConstraint->B_localpos().translation()).norm();
+
+    cnoid::Quaternion(state.frame[6],state.frame[3],state.frame[4],state.frame[5]).toRotationMatrix();
+    const cnoid::AngleAxis angleAxis = cnoid::AngleAxis(cnoid::Quaternion(state.frame[6],state.frame[3],state.frame[4],state.frame[5]).toRotationMatrix() * goalConstraint->B_localpos().linear().transpose());
+    node->heuristic() = angleAxis.angle();
+
+    // cnoid::Vector3 pos = cnoid::Vector3::Zero();
+    // for (int i=0; i<state.contacts.size(); i++) {
+    //   pos += state.contacts[i].c2.localPose.translation();
+    // }
+    // cnoid::Vector3 centorOfContact = pos / state.contacts.size();
+    // node->heuristic() = (centorOfContact - goalConstraint->B_localpos().translation()).norm();
+    
   }
 
   std::vector<std::shared_ptr<graph_search::Node> > WholeBodyContactPlanner::gatherAdjacentNodes(std::shared_ptr<graph_search::Planner::TransitionCheckParam> checkParam) {
@@ -381,7 +387,7 @@ namespace contact_before_motion{
               scfrConstraints[j]->links().push_back(nullptr);
               cnoid::Isometry3 pose = contactCheckParam->preState.contacts[i].c2.localPose;
               for (int b=0; b < contactCheckParam->bodies.size(); b++) {
-                if ((contactCheckParam->bodies[b]->name() != contactCheckParam->preState.contacts[i].c2.bodyName) && contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c2.linkName)) pose = contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c2.linkName)->T() * contactCheckParam->preState.contacts[i].c2.localPose;
+                if ((contactCheckParam->bodies[b]->name() == contactCheckParam->preState.contacts[i].c2.bodyName) && contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c2.linkName)) pose = contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c2.linkName)->T() * contactCheckParam->preState.contacts[i].c2.localPose;
               }
               pose.linear() *= cnoid::rotFromRpy(0.0, M_PI, M_PI/2).transpose();
               scfrConstraints[j]->poses().push_back(pose);
@@ -400,7 +406,7 @@ namespace contact_before_motion{
               scfrConstraints[j]->links().push_back(nullptr);
               cnoid::Isometry3 pose = contactCheckParam->preState.contacts[i].c1.localPose;
               for (int b=0; b < contactCheckParam->bodies.size(); b++) {
-                if ((contactCheckParam->bodies[b]->name() != contactCheckParam->preState.contacts[i].c1.bodyName) && contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c1.linkName)) pose = contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c1.linkName)->T() * contactCheckParam->preState.contacts[i].c1.localPose;
+                if ((contactCheckParam->bodies[b]->name() == contactCheckParam->preState.contacts[i].c1.bodyName) && contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c1.linkName)) pose = contactCheckParam->bodies[b]->link(contactCheckParam->preState.contacts[i].c1.linkName)->T() * contactCheckParam->preState.contacts[i].c1.localPose;
               }
               pose.linear() *= cnoid::rotFromRpy(0.0, M_PI, M_PI/2).transpose();
               scfrConstraints[j]->poses().push_back(pose);
@@ -439,8 +445,7 @@ namespace contact_before_motion{
 
     if ((ikState==IKState::DETACH_FIXED) ||
         (ikState==IKState::ATTACH_PRE)) {
-      if (moveContactConstraint->B_link()) moveContactConstraint->B_localpos().translation() += moveContactConstraint->B_link()->R() * moveContactConstraint->B_localpos().linear() * cnoid::Vector3(0,0,0.04);
-      else moveContactConstraint->B_localpos().translation() += moveContactConstraint->B_localpos().linear() * cnoid::Vector3(0,0,0.04);
+      moveContactConstraint->B_localpos().translation() += moveContactConstraint->B_localpos().linear() * cnoid::Vector3(0,0,0.04);
     }
     moveContactConstraint->eval_link() = moveContactConstraint->B_link();
     moveContactConstraint->eval_localR() = moveContactConstraint->B_localpos().linear();
@@ -491,7 +496,7 @@ namespace contact_before_motion{
 
     std::static_pointer_cast<ik_constraint2::PositionConstraint>(contactCheckParam->goalConstraint)->precision() = goalPrecision;
     if (solved && ((ikState==IKState::ATTACH_FIXED) || (ikState==IKState::DETACH_FIXED))) {
-      postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
+      // postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
       std::vector<std::vector<std::shared_ptr<ik_constraint2::IKConstraint> > > constraint_goal;
       constraint_goal.push_back(constraints0);
       constraint_goal.push_back(constraints1);
@@ -525,7 +530,7 @@ namespace contact_before_motion{
     // }
 
     if (solved) {
-      postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
+      // postState.transition.insert(postState.transition.end(), (*tmpPath).begin(), (*tmpPath).end());
     }
 
     return solved;
