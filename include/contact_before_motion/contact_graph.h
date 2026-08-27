@@ -41,8 +41,6 @@ namespace contact_before_motion{
       gikParam.pikParam.we = 1e1; // 逆運動学が振動しないこと優先. 1e0だと不安定. 1e3だと大きすぎる
       gikParam.pikParam.wmax = 1e0; // 1e2程度にすると関節がめり込まなくなるが、ほとんど動かない.
       gikParam.pikParam.convergeThre = 5e-3;
-      gikParam.modelMutex = std::make_shared<std::mutex>();
-
       pikParam.checkFinalState=true;
       pikParam.calcVelocity = false;
       pikParam.debugLevel = 0;
